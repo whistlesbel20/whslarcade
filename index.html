@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Nintondo Connection Tester</title>
+    <meta charset="utf-8" />
+    <style>
+        body { font-family: monospace; background-color: #1a1a1a; color: #f0f0f0; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        #container { border: 1px solid #555; padding: 30px; border-radius: 8px; width: 600px; }
+        button { font-size: 16px; padding: 10px 20px; cursor: pointer; }
+        #status-log { margin-top: 20px; border: 1px solid #333; background-color: #000; padding: 15px; height: 200px; overflow-y: auto; list-style-type: none; }
+        li { padding: 4px 0; border-bottom: 1px solid #222; }
+        .pass { color: #00ff00; }
+        .fail { color: #ff4444; }
+        .info { color: #ffff00; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1>Nintondo Connection Tester</h1>
+        <p>This page tests the core connection to the Nintondo Wallet.</p>
+        <button id="connectBtn">Start Connection Test</button>
+        <ul id="status-log">
+            <li>Waiting for test to start...</li>
+        </ul>
+    </div>
+
+    <!-- INLINED NINTONDO SDK SCRIPT -->
+    <script>
+    !function(t,e){"object"==typeof exports&&"object"==typeof module?module.exports=e():"function"==typeof define&&define.amd?define([],e):"object"==typeof exports?exports.NintondoSDK=e():t.NintondoSDK=e()}(self,(function(){return(()=>{"use strict";var t={d:(e,r)=>{for(var n in r)t.o(r,n)&&!t.o(e,n)&&Object.defineProperty(e,n,{enumerable:!0,get:r[n]})},o:(t,e)=>Object.prototype.hasOwnProperty.call(t,e),r:t=>{"undefined"!=typeof Symbol&&Symbol.toStringTag&&Object.defineProperty(t,Symbol.toStringTag,{value:"Module"}),Object.defineProperty(t,"__esModule",{value:!0})}},e={};t.r(e),t.d(e,{default:()=>r,initNintondo:()=>n});const r=()=>{let t;try{t=window.nintondo}catch(t){console.error(t)}return t};const n=r;return e})()}));
+    </script>
+    
+    <!-- MAIN APPLICATION LOGIC -->
+    <script>
+        const connectBtn = document.getElementById('connectBtn');
+        const statusLog = document.getElementById('status-log');
+
+        function logStatus(message, className) {
+            const li = document.createElement('li');
+            li.textContent = message;
+            li.className = className;
+            statusLog.appendChild(li);
+            // Auto-scroll to the bottom
+            statusLog.scrollTop = statusLog.scrollHeight;
+        }
+
+        connectBtn.addEventListener('click', async () => {
+            statusLog.innerHTML = ''; // Clear previous logs
+            logStatus('Test Started...', 'info');
+
+            // 1. Check for the SDK object itself
+            if (typeof window.NintondoSDK === 'undefined' || !window.NintondoSDK) {
+                logStatus('FAIL: The "window.NintondoSDK" object was not found. The inlined script is being blocked from executing.', 'fail');
+                return;
+            }
+            logStatus('PASS: "window.NintondoSDK" object was found.', 'pass');
+
+            try {
+                // 2. Try to initialize the connection
+                const nintondo = window.NintondoSDK.initNintondo();
+                if (!nintondo) {
+                    throw new Error("Nintondo Wallet extension not found. Please make sure it is installed and enabled.");
+                }
+                logStatus('PASS: Wallet object initialized successfully.', 'pass');
+
+                // 3. Try to request the user's accounts
+                logStatus('ACTION: Requesting accounts. Please check your Nintondo Wallet for a connection popup.', 'info');
+                const accounts = await nintondo.request({ method: 'requestAccounts' });
+                const userAddress = accounts[0];
+
+                if (!userAddress) {
+                    throw new Error("Wallet responded, but no address was returned.");
+                }
+                logStatus(`SUCCESS! Connected to address: ${userAddress}`, 'pass');
+
+            } catch (err) {
+                logStatus(`FAIL: ${err.message}`, 'fail');
+            }
+        });
+    </script>
+</body>
+</html>
