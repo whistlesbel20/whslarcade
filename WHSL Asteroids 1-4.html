@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Nintondo Direct Connection Tester</title>
+    <meta charset="utf-8" />
+    <style>
+        body { font-family: monospace; background-color: #1a1a1a; color: #f0f0f0; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        #container { border: 1px solid #555; padding: 30px; border-radius: 8px; width: 600px; }
+        button { font-size: 16px; padding: 10px 20px; cursor: pointer; }
+        #status-log { margin-top: 20px; border: 1px solid #333; background-color: #000; padding: 15px; height: 200px; overflow-y: auto; list-style-type: none; }
+        li { padding: 4px 0; border-bottom: 1px solid #222; }
+        .pass { color: #00ff00; }
+        .fail { color: #ff4444; }
+        .info { color: #ffff00; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1>Nintondo Direct Connection Tester</h1>
+        <p>This page uses the same direct connection method as the official Nintondo website.</p>
+        <button id="connectBtn">Start Connection Test</button>
+        <ul id="status-log">
+            <li>Waiting for test to start...</li>
+        </ul>
+    </div>
+    
+    <!-- No SDK script is needed. We are connecting directly. -->
+
+    <script>
+        const connectBtn = document.getElementById('connectBtn');
+        const statusLog = document.getElementById('status-log');
+
+        function logStatus(message, className) {
+            const li = document.createElement('li');
+            li.textContent = message;
+            li.className = className;
+            statusLog.appendChild(li);
+            statusLog.scrollTop = statusLog.scrollHeight;
+        }
+
+        connectBtn.addEventListener('click', async () => {
+            statusLog.innerHTML = ''; // Clear logs
+            logStatus('Test Started...', 'info');
+
+            try {
+                // 1. Check directly for the wallet's injected object. THIS IS THE KEY CHANGE.
+                if (typeof window.nintondo === 'undefined' || !window.nintondo) {
+                    throw new Error("FAIL: The 'window.nintondo' object was not found. The extension is not injecting itself into this page.");
+                }
+                logStatus('PASS: "window.nintondo" object was found.', 'pass');
+                
+                // 2. Use the object directly, just like the official site.
+                const nintondo = window.nintondo;
+
+                logStatus('ACTION: Requesting accounts. Please check your wallet for a popup.', 'info');
+                const accounts = await nintondo.request({ method: 'requestAccounts' });
+                const userAddress = accounts[0];
+
+                if (!userAddress) {
+                    throw new Error("Wallet responded, but no address was returned.");
+                }
+                logStatus(`SUCCESS! Connected to address: ${userAddress}`, 'pass');
+
+            } catch (err) {
+                logStatus(err.message, 'fail');
+            }
+        });
+    </script>
+</body>
+</html>```
+
+### **Instructions**
+
+1.  **Redeploy:** Replace the code on your GitHub Pages with this new version.
+2.  **Wait:** Give it 1-2 minutes for the changes to go live.
+3.  **Test:** Navigate to your URL and run the test.
+
+### **Expected Outcome**
+
+This version has the highest probability of success. Because we are now using the exact same object (`window.nintondo`) that the official site uses, if your wallet is working there, it should work here.
+
+Please let me know the log output from this test. This will be the definitive result.
