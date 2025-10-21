@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WHSL Asteroids</title>
+    <meta charset="utf-8" />
+    <style>
+        body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; color: white; font-family: 'Courier New', Courier, monospace; }
+        #game-container { display: none; }
+        #gate-container { text-align: center; padding: 20px; }
+        h1 { font-size: 2.5em; margin-bottom: 10px; color: #fff; }
+        p { font-size: 1.2em; color: #ccc; }
+        button { background-color: #f0f0f0; color: #000; border: none; padding: 15px 30px; font-size: 18px; font-weight: bold; cursor: pointer; border-radius: 5px; transition: background-color 0.3s; }
+        button:hover { background-color: #fff; }
+        #status-message { height: 20px; margin-top: 20px; font-size: 1em; color: #00ff00; }
+    </style>
+</head>
+<body>
+    <div id="gate-container">
+        <h1>WHSL ASTEROIDS</h1>
+        <p>You must hold $WHSL token to play.</p>
+        <button id="connect-wallet-btn">Connect Nintondo Wallet</button>
+        <p id="status-message"></p>
+    </div>
+    <div id="game-container"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/nintondo-sdk@latest/dist/index.global.js"></script>
+
+    <script>
+        window.addEventListener('load', () => {
+            const connectWalletBtn = document.getElementById('connect-wallet-btn');
+            const statusMessageEl = document.getElementById('status-message');
+            const gateContainer = document.getElementById('gate-container');
+            const gameContainer = document.getElementById('game-container');
+
+            const WHSL_TOKEN_TICKER = 'WHSL';
+            const REQUIRED_BALANCE = 1;
+
+            connectWalletBtn.addEventListener('click', handleConnection);
+
+            async function handleConnection() {
+                statusMessageEl.style.color = '#ff4444'; 
+                if (typeof window.NintondoSDK === 'undefined') {
+                    statusMessageEl.innerText = 'Error: Nintondo SDK failed to load. Please check your network connection.';
+                    return; 
+                }
+                try {
+                    const nintondo = window.NintondoSDK.initNintondo();
+                    if (!nintondo) {
+                        throw new Error("Nintondo Wallet not found. Please install the extension.");
+                    }
+                    statusMessageEl.style.color = '#ffff00';
+                    statusMessageEl.innerText = 'Requesting connection...';
+                    const accounts = await nintondo.request({ method: 'requestAccounts' });
+                    const userAddress = accounts[0];
+                    if (!userAddress) throw new Error("Failed to retrieve a wallet address.");
+                    statusMessageEl.innerText = `Wallet connected. Verifying $${WHSL_TOKEN_TICKER} balance...`;
+                    await checkTokenBalance(userAddress);
+                } catch (err) {
+                    statusMessageEl.innerText = err.message || 'Connection rejected or failed.';
+                }
+            }
+
+            async function checkTokenBalance(address) {
+                try {
+                    const apiUrl = `https://api.nintondo.io/api/address/${address}`;
+                    const response = await fetch(apiUrl);
+                    if (!response.ok) throw new Error('Nintondo API request failed.');
+                    const data = await response.json();
+                    let hasSufficientBalance = false;
+                    if (data?.tokens?.length > 0) {
+                        const targetToken = data.tokens.find(t => t.ticker === WHSL_TOKEN_TICKER);
+                        if (targetToken && parseFloat(targetToken.balance) >= REQUIRED_BALANCE) {
+                            hasSufficientBalance = true;
+                        }
+                    }
+                    if (hasSufficientBalance) {
+                        statusMessageEl.style.color = '#00ff00';
+                        statusMessageEl.innerText = 'Verification successful. Launching game...';
+                        gateContainer.style.display = 'none';
+                        gameContainer.style.display = 'block';
+                        startGame();
+                    } else {
+                        statusMessageEl.style.color = '#ff4444';
+                        statusMessageEl.innerText = `Verification failed. A minimum of ${REQUIRED_BALANCE} $${WHSL_TOKEN_TICKER} is required.`;
+                    }
+                } catch (error) {
+                    statusMessageEl.style.color = '#ff4444';
+                    statusMessageEl.innerText = 'Could not verify token balance. Please try again.';
+                }
+            }
+        });
+
+        function startGame() {
+            const config = {
+                type: Phaser.AUTO,
+                width: 800,
+                height: 600,
+                parent: 'game-container',
+                physics: { default: 'arcade', arcade: { gravity: { y: 0 } } },
+                scene: { preload: preload, create: create, update: update }
+            };
+            const game = new Phaser.Game(config);
+            let player, cursors, fireKey, bullets;
+            function preload() {}
+            function create() {
+                let g = this.add.graphics(); g.fillStyle(0xffffff, 1); g.beginPath(); g.moveTo(10, 0); g.lineTo(-10, 10); g.lineTo(-10, -10); g.closePath(); g.fillPath(); g.generateTexture('ship', 20, 20); g.destroy();
+                g = this.add.graphics(); g.fillStyle(0xffffff, 1); g.fillCircle(2, 2, 2); g.generateTexture('bullet', 4, 4); g.destroy();
+                player = this.physics.add.sprite(400, 300, 'ship').setDrag(100).setAngularDrag(100).setMaxVelocity(200);
+                cursors = this.input.keyboard.createCursorKeys();
+                fireKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+                bullets = this.physics.add.group({ defaultKey: 'bullet', maxSize: 10 });
+            }
+            function update() {
+                if (cursors.left.isDown) player.setAngularVelocity(-150); else if (cursors.right.isDown) player.setAngularVelocity(150); else player.setAngularVelocity(0);
+                if (cursors.up.isDown) this.physics.velocityFromRotation(player.rotation, 200, player.body.acceleration); else player.setAcceleration(0);
+                if (Phaser.Input.Keyboard.JustDown(fireKey)) { let b = bullets.get(player.x, player.y); if (b) { b.setActive(true).setVisible(true); this.physics.velocityFromRotation(player.rotation, 400, b.body.velocity); } }
+                this.physics.world.wrap(player, 32); bullets.children.each(b => { if (b.active) { this.physics.world.wrap(b, 16); }});
+            }
+        }
+    </script>
+</body>
+</html>
